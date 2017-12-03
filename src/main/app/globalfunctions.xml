@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:cluster="http://www.mulesoft.org/schema/mule/ee/cluster" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <configuration doc:name="Configuration">
+        <expression-language>
+        	<global-functions>
+        		def addTax(itemsTotal) {
+        			return itemsTotal * 1.13;
+        		}
+        		def addTaxAndRound(itemsTotal) {
+        			java.text.DecimalFormat format = new java.text.DecimalFormat("##.##");
+        			return format.format(itemsTotal * 1.13);
+        		}
+        	</global-functions>
+        </expression-language>
+    </configuration>
+    <flow name="globalFunctionsDWFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/globalfunctiondw" doc:name="HTTP"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	name: payload.name,
+	itemsTotal: payload.itemsTotal,
+	orderTotal: addTaxAndRound(payload.itemsTotal)
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="globalFunctionsMEFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/globalfunctionme" doc:name="HTTP"/>
+        <json:json-to-object-transformer returnClass="com.jasonestevan.entities.Person" doc:name="JSON to Object"/>
+        <expression-component doc:name="Expression"><![CDATA[payload.orderTotal = addTaxAndRound(payload.itemsTotal)]]></expression-component>
+        <json:object-to-json-transformer doc:name="Object to JSON"/>
+    </flow>
+</mule>
